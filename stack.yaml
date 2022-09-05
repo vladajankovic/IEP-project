@@ -1,0 +1,116 @@
+version: '3'
+
+services:
+  user-database:
+    image: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+#    healthcheck:
+#      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+#      timeout: 10s
+#      retries: 10
+    volumes:
+      - user_db_data:/var/lib/mysql
+    networks:
+      - authentication_network
+
+  authdbmigration:
+    image: authdbmigration
+    environment:
+      DB_URL: user-database
+    networks:
+      - authentication_network
+
+  authapplication:
+    image: authapplication
+    environment:
+      DB_URL: user-database
+    ports:
+      - 5002:5002
+    networks:
+      - authentication_network
+
+  store-database:
+    image: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+#    healthcheck:
+#      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+#      timeout: 10s
+#      retries: 10
+    volumes:
+      - store_db_data:/var/lib/mysql
+    networks:
+      - daemon_net
+      - admin_net
+      - buyer_net
+
+  redis:
+    image: redis
+    ports:
+      - 6379:6379
+    networks:
+      - warehouse_net
+      - daemon_net
+
+  storedbmigration:
+    image: storedbmigration
+    environment:
+      DB_URL: store-database
+    networks:
+      - daemon_net
+
+  daemon:
+    image: daemon
+    environment:
+      DB_URL: store-database
+      REDIS_HOST: redis
+    networks:
+      - daemon_net
+
+  warehouse:
+    image: warehouse
+    environment:
+      REDIS_HOST: redis
+    ports:
+      - 6001:6001
+    networks:
+      - warehouse_net
+    deploy:
+      replicas: 3
+
+  buyer:
+    image: buyer
+    environment:
+      DB_URL: store-database
+    ports:
+      - 6002:6002
+    networks:
+      - buyer_net
+    deploy:
+      replicas: 3
+
+  admin:
+    image: admin
+    environment:
+      DB_URL: store-database
+    ports:
+      - 6003:6003
+    networks:
+      - admin_net
+
+volumes:
+  user_db_data:
+  store_db_data:
+
+networks:
+  authentication_network:
+    driver: overlay
+  warehouse_net:
+    driver: overlay
+  daemon_net:
+    driver: overlay
+  admin_net:
+    driver: overlay
+  buyer_net:
+    driver: overlay
